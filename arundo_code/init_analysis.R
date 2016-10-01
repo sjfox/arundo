@@ -9,7 +9,6 @@ library(magrittr)
 arundo <- read_csv("data/p1_sensor_data.csv")
 arundo <- arundo[-nrow(arundo), ]
 colnames(arundo) <- ifelse(colnames(arundo)!="time", paste("sensor_", colnames(arundo), sep=""), colnames(arundo))
-
 arundo$time <- mdy_hms(arundo$time)
 
 ################################
