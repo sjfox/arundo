@@ -1,6 +1,6 @@
 # Arundo R code for project
 
-If you clone this repository onto your computer, it will create a folder with all of the code. I haven't added the data to the code, because they are large files (and may be proprietary). Therefore, to get the code to run, you will need to set up the folder as such:
+If you clone this repository onto your computer, it will create a folder with all of the code. I haveonly added the folders, but not the data. Ensure your folder is set up as such:
 
 
 ```
