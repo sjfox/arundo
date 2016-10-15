@@ -1,0 +1,97 @@
+---
+title: "Regression analysis"
+author: "Spencer Fox"
+date: "10/14/2016"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, error = FALSE)
+knitr::opts_knit$set(root.dir = "../")
+
+library(tidyverse)
+library(lubridate)
+library(cowplot)
+library(magrittr)
+library(caret)
+library(modelr)
+```
+
+## Examining the data
+First we need to read in the data and clean it slightly. The `p1_sensor_data.csv` has already been subsetted data with only the `time` and 5 necessary sensor columns.
+
+```{r examine_data}
+arundo <- read_csv("data/p1_sensor_data.csv")
+arundo <- arundo[-nrow(arundo), ]
+colnames(arundo) <- ifelse(colnames(arundo)!="time", paste("sensor_", colnames(arundo), sep=""), colnames(arundo))
+arundo$time <- mdy_hms(arundo$time)
+head(arundo)
+```
+
+## Testing linear regression assumptions
+Check to see whether the data are normal. They aren't, and transformations do not fix appreciably.
+
+### Raw Data
+```{r, cache=TRUE}
+# Actual data
+arundo %>% gather(sensor, reading, sensor_59:sensor_63) %>%
+  ggplot(aes(reading)) + geom_density() +facet_wrap(~sensor, scale="free_x")
+
+```
+
+### Transformed Data
+```{r, cache=TRUE}
+# Log transformed
+arundo %>% gather(sensor, reading, sensor_59:sensor_63) %>%
+  mutate(reading = log(reading))%>%
+  ggplot(aes(reading)) + geom_density() +facet_wrap(~sensor, scale="free_x")
+
+```
+
+Even though the data are not actually normal, it may not be an issue because there are so many data points. Proceed with analysis and will check assumptions later
+
+## Run Linear Regression
+First we will fit the model to the training data. This involves filtering the data for only the last years worth of data, and then fitting the linear model.
+
+```{r run_lm, cache=TRUE}
+fit_model <- arundo %>% filter(year(time) == 2015) %>%
+  lm(sensor_62~ sensor_59+sensor_60 +sensor_61 + sensor_63, data = .)
+summary(fit_model)
+```
+
+## Test the fit
+We first add predictions from the model onto the training data (all data but 2015), and then calculate the mean squared error (MSE). The MSE is somewhat large due to the first data point outlier. Removing this data point yields an extremely small and acceptable MSE.
+```{r test_fit, cache=TRUE}
+test_results <- arundo %>% filter(year(time) !=2015) %>%
+  add_predictions(model = fit_model) %>%
+  mutate(resid = pred-sensor_62) 
+  
+# Raw MSE
+mean(test_results$resid^2)
+
+# Outlier Removed
+mean(test_results$resid[-1]^2)
+```
+
+## Test the model assumptions
+Looks like the end model meets the assumptions of linear regression even though the data aren't originally normal, so plan to keep fitted model.
+```{r test_assumptions, cache=TRUE}
+resid(fit_model) %>%
+  as_data_frame %>%
+  ggplot(aes(value)) + geom_histogram() + 
+    coord_cartesian(expand=FALSE) +
+    labs(x="Residuals", title="Residuals from the fit model on the training data")
+
+# Check heteroscedasticity
+resid(fit_model) %>%
+  as_data_frame %>%
+  mutate(predictions = predict(fit_model)) %>%
+  ggplot(aes(predictions, value)) + geom_point(alpha=0.1) + 
+    geom_smooth(se = FALSE) +
+    labs(x="Predicted Y Values", title="Testing Heteroscedasticity from training data", y="Residuals")
+
+```
+
+
